@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SchemeFinder - Serverless AWS Platform</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; margin: 0; padding: 20px; color: #1e293b; }
+        .container { max-width: 850px; margin: auto; }
+        .header { background: #0f172a; color: white; padding: 25px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        select, button { padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 15px; width: 100%; }
+        button { background: #2563eb; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background: #1d4ed8; }
+        .scheme-item { border-left: 5px solid #2563eb; background: #f8fafc; padding: 15px; margin-top: 15px; border-radius: 8px; }
+        .btn-group { display: flex; gap: 10px; margin-top: 12px; }
+        .btn-remind { background: #059669; width: auto; padding: 8px 15px; font-size: 14px; }
+        .btn-apply { background: #0f172a; color: white; text-decoration: none; padding: 8px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>SchemeFinder (Serverless)</h1>
+        <p>Discover Government Schemes Powered by AWS Lambda, DynamoDB, Translate & SNS</p>
+    </div>
+
+    <div class="card">
+        <h3>Find Eligible Schemes</h3>
+        <div class="filters">
+            <select id="category">
+                <option value="All">All Categories</option>
+                <option value="Student">Student</option>
+                <option value="Farmer">Farmer</option>
+                <option value="Job Seeker">Job Seeker</option>
+            </select>
+            <select id="state">
+                <option value="All">All States</option>
+                <option value="Madhya Pradesh">Madhya Pradesh</option>
+                <option value="All India">All India</option>
+            </select>
+            <select id="language">
+                <option value="en">English</option>
+                <option value="hi">Hindi (Amazon Translate)</option>
+            </select>
+            <button onclick="findSchemes()">Search Schemes</button>
+        </div>
+    </div>
+
+    <div id="results"></div>
+</div>
+
+<script>
+    const API_URL = "https://3u7mbkgypyxvxjpe3zvbcw4ngm0rshrr.lambda-url.ap-southeast-2.on.aws/";
+
+    async function findSchemes() {
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = "<div class='card'>Searching serverless database...</div>";
+
+        const payload = {
+            action: "search",
+            category: document.getElementById('category').value,
+            state: document.getElementById('state').value,
+            language: document.getElementById('language').value
+        };
+
+        try {
+            const res = await fetch(API_URL, {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            
+            if (!data.schemes || data.schemes.length === 0) {
+                resultsDiv.innerHTML = "<div class='card'>No matching schemes found.</div>";
+                return;
+            }
+
+            resultsDiv.innerHTML = data.schemes.map(s => `
+                <div class="card scheme-item">
+                    <h3>${s.title}</h3>
+                    <p>${s.description}</p>
+                    <p><strong>Required Documents:</strong> ${s.documents}</p>
+                    <p><strong>Deadline:</strong> ${s.deadline} | <strong>State:</strong> ${s.state}</p>
+                    <div class="btn-group">
+                        <a href="${s.link}" target="_blank" class="btn-apply">Official Portal ↗</a>
+                        <button class="btn-remind" onclick="sendReminder('${s.title}', '${s.deadline}')">🔔 Email Deadline Reminder (SNS)</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) {
+            resultsDiv.innerHTML = "<div class='card'>Error: " + err.message + "</div>";
+        }
+    }
+
+    async function sendReminder(title, deadline) {
+        alert("Sending reminder via Amazon SNS...");
+        const res = await fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "remind", title, deadline })
+        });
+        const data = await res.json();
+        alert(data.message);
+    }
+</script>
+</body>
+</html>
